@@ -1,6 +1,5 @@
 const mapsClient = require('@google/maps').createClient({
     key: process.env.GOOGLE_API_KEY,
-    // key: 'AIzaSyDKm2OaKWbipDCIQCpIAIsLzdiAXGcDH88',
     Promise: Promise,
 });
 
