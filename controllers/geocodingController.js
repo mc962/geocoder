@@ -29,3 +29,15 @@ exports.geocode = async (req, res) => {
         res.send(500, errorMessage);
     });
 };
+
+exports.reverseGeocode = async (req, res) => {
+    await mapsClient.reverseGeocode({
+        // const latLng
+    }).asPromise()
+    .then((response) => {
+
+    })
+    .catch((err) => {
+
+    });
+};

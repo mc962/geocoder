@@ -33,7 +33,8 @@ const herokuSetEnvVars = (herokuEnvVars) => {
 };
 
 const herokuPostEnvVar = (envVar) => {
-    console.log(`Setting: ${envVar}`);
+    const envVarName = envVar.split('=')[0];
+    console.log(`Setting: ${envVarName}`);
     exec(`heroku config:set ${envVar}`);
 };
 

@@ -2,6 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const winston = require('winston');
 const { format } = require('logform');
@@ -55,6 +56,7 @@ app.use(morgan('combined', { stream: logger.stream }));
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));
+app.use(cookieParser(process.env.SECRET_KEY_BASE));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // init main router
