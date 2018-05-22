@@ -73,7 +73,7 @@ router.get('/ping', (req, res) => {
 
 
 // add router to app, with everything namespaced under config prefix
-app.use(config.apiPrefix, router);
+app.use('/', router);
 
 // catch 404 and forward to error handler
 app.use((req, res, next) => {
