@@ -1,7 +1,7 @@
 const geocodingRouter = require('express').Router({ mergeParams: true });
 const geocodingController = require('../controllers/geocodingController');
 
-geocodingRouter.get('/geocode', geocodingController.geocode);
+geocodingRouter.get('/coordinates', geocodingController.coordinates);
 
 geocodingRouter.get('/reverse-geocode', geocodingController.reverseGeocode);
 

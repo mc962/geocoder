@@ -1,19 +1,37 @@
+const _first = require('lodash/first');
+
 const mapsClient = require('@google/maps').createClient({
     key: process.env.GOOGLE_API_KEY,
     Promise: Promise,
 });
 
-exports.geocode = async (req, res) => {
+
+const geocode = async (req, res) => {
     await mapsClient.geocode({
         address: req.params.address || req.query.address,
     }).asPromise()
     .then((response) => {
-        results = response.json.results[0];
-        latLng = results.geometry.location;
-        address = results.formatted_address;
-        console.log(`City: ${address} -`,
-        `Latitude: ${latLng.lat} -`,
-        `Longitude: ${latLng.lng}`);
+        results = response.json.results;
+        status = response.status;
+        responseData = {status: status, results: results};
+        return Promise.resolve(responseData);
+    })
+    .catch((err) => {
+        return new Promise((resolve, reject) => {
+            reject(err);
+        });
+    });
+};
+
+const coordinates = async (req, res) => {
+    await geocode(req)
+    .then((responseData) => {
+        singleResults = _first(results);
+        latLng = singleResults.geometry.location;
+        address = singleResults.formatted_address;
+        console.log(`Status: ${status} - City: ${address} -`,
+            `Latitude: ${latLng.lat} -`,
+            `Longitude: ${latLng.lng}`);
 
         const responseJSON = {
             location: address,
@@ -23,14 +41,11 @@ exports.geocode = async (req, res) => {
         res.send(200, responseJSON);
     })
     .catch((err) => {
-        const errorMessage = `${err.json.status}: ${err.json.error_message}`;
-        status = err.status >= 400 ? err.status : 500;
-        console.error(errorMessage);
-        res.send(status, errorMessage);
+        _handleGeocodeError(res, err);
     });
 };
 
-exports.reverseGeocode = async (req, res) => {
+const reverseGeocode = async (req, res) => {
     // TODO logic to handle geolocation information stored on request cookies
     const latLngStr = req.params.latLng || req.query.latLng;
     let latLng;
@@ -54,9 +69,19 @@ exports.reverseGeocode = async (req, res) => {
         res.send(200, responseJSON);
     })
     .catch((err) => {
-        const errorMessage = `${err.json.status}: ${err.json.error_message}`;
-        status = err.status >= 400 ? err.status : 500;
-        console.error(errorMessage);
-        res.send(500, errorMessage);
+        _handleGeocodeError(res, err);
     });
+};
+
+const _handleGeocodeError = (res, err) => {
+    const errorMessage = `${err.json.status}: ${err.json.error_message}`;
+    const logMessage = `${err.status} - ${errorMessage}`;
+    status = err.status >= 400 ? err.status : 500;
+    console.error(logMessage);
+    res.send(status, errorMessage);
+};
+
+module.exports = {
+    coordinates: coordinates,
+    reverseGeocode: reverseGeocode,
 };
