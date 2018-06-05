@@ -13,6 +13,8 @@ geocodingRouter.get('/location', [
     geocodingController.place,
 ]);
 
+geocodingRouter.get('/redis', geocodingController.testRedis);
+
 geocodingRouter.get('/ping', (req, res, next) => {
     res.status(200).json({ message: 'Geocoding PONG' });
 });

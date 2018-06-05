@@ -1,25 +1,46 @@
 const { promisify } = require('util');
 const redisClient = require('redis').createClient(process.env.REDIS_URL);
 
-exports.rGetAsync = promisify(redisClient.get).bind(redisClient);
-exports.rSetAsync = promisify(redisClient.set).bind(redisClient);
+const rGetAsync = promisify(redisClient.get).bind(redisClient);
+const rSetAsync = promisify(redisClient.set).bind(redisClient);
 
-exports.fetchAsync = async (key, opts, cbArgs) => {
+const rFetchAsync = async (req, res, key, fetchCb = null, cbArgs = []) => {
     // if get(key) is true
         // return get(key)
     // else get val from service
     // then set(key, val)
-
-    await rGetAsync(key).then((response) => {
-        if (response) {
-            promCb(...cbArgs)
-            .then(async (resp) => {
-                await rSetAsync(key, resp, opts).then(() => resp);
+    // TODO handle TTLs
+    if (fetchCb) {
+        return await rGetAsync(key).then((responseVal) => {
+            // console.log(responseVal);
+            if (responseVal) {
+                return responseVal;
+            } else {
+                return fetchCb(req, res, ...cbArgs)
+                    .then(async (resp) => {
+                        await rSetAsync(key, resp)
+                            .then((setRes) => {
+                                return resp;
+                            });
+                    })
+                    .catch((err) => {
+                        return err;
+                    });
+            }
+        });
+    } else {
+        return await rGetAsync(key)
+            .then((response) => {
+                return responseVal;
             })
             .catch((err) => {
-                console.error(err);
-                return null;
+                return err;
             });
-        }
-    });
+    }
+};
+
+module.exports = {
+    rGetAsync: rGetAsync,
+    rSetAsync: rSetAsync,
+    rFetchAsync, rFetchAsync,
 };
