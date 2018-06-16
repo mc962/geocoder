@@ -1,6 +1,6 @@
 const _first = require('lodash/first');
 const slugify = require('slugify');
-const { rFetchAsync } = require('../util/redis');
+const { rFetchAsync, redisOptions } = require('../util/redis');
 
 const mapsClient = require('@google/maps').createClient({
     key: process.env.GOOGLE_API_KEY,
@@ -9,7 +9,7 @@ const mapsClient = require('@google/maps').createClient({
 
 const _coordinatesFromCache = async (address) => {
     const key = _citySlug(address);
-    return await rFetchAsync(key, _geocode, [address])
+    return await rFetchAsync(key, _geocode, [address], redisOptions().ex)
         .then((responseData) => {
             return responseData;
         })
