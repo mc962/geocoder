@@ -8,9 +8,15 @@ const mapsClient = require('@google/maps').createClient({
     Promise: Promise,
 });
 
-const _coordinatesFromCache = async (address, deleteCached = false) => {
+const _coordinatesFromCache = async (address, refreshCached = false) => {
     const key = _citySlug(address);
-    return await rFetchAsync(key, null, [address], redisOptions().ex)
+    const cbOptions = {
+        fetchCb: _geocode,
+        cbArgs: [address],
+        refreshCached: refreshCached,
+    };
+
+    return await rFetchAsync(key, cbOptions, redisOptions().ex)
         .then((responseData) => {
             const resultObj = GeocoderServiceResult.coerceResult(responseData);
             return resultObj;
@@ -33,12 +39,12 @@ const _placeFromCache = async (latLng) => {
 
 const coordinates = async (req, res) => {
     const cached = req.params.cached || req.query.cached;
-    const deleteCached = req.params.delete_cached || req.query.delete_cached;
+    const refreshCached = req.params.refresh_cached || req.query.refresh_cached;
     const address = req.params.address || req.query.address;
 
     const geocode = cached ? _coordinatesFromCache : _geocode;
 
-    await geocode(address, deleteCached)
+    await geocode(address, refreshCached)
         .then((geocodeResult) => {
             if (geocodeResult.empty()) {
                 const err = _constructLocalGeocodeError(404, 'NOT FOUND', 'No results found'); // eslint-disable-line max-len

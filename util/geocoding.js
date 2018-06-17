@@ -1,5 +1,4 @@
 const _first = require('lodash/first');
-const {NotImplementedError} = require('../util/errors');
 
 /**
  * Format a geocoder response into an expected results object
@@ -16,21 +15,29 @@ class GeocoderServiceResult {
         this.results = results;
         // first result is most accurate result, usually used
         // in other methods for obtaining properties from
-        this.firstResult = _first(results);
+        this.firstResult = _first(results) || null;
     }
 
     /**
      * @return {Object} location object representing latLng coordinates
      */
     latLng() {
-        return this.firstResult.geometry.location;
+        if (this.firstResult) {
+            return this.firstResult.geometry.location;
+        } else {
+            return null;
+        }
     }
 
     /**
      * @return {String} address string extracted form results
      */
     address() {
-        return this.firstResult.formatted_address;
+        if (this.firstResult) {
+            return this.firstResult.formatted_address;
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -52,7 +59,8 @@ class GeocoderServiceResult {
         if (data instanceof GeocoderServiceResult) {
             return data;
         } else {
-            return new GeocoderServiceResult(data.status, data.results);
+            const factoryResult = new GeocoderServiceResult(data.status, data.results); // eslint-disable-line max-len
+            return factoryResult;
         }
     }
 
@@ -66,6 +74,7 @@ class GeocoderServiceResult {
     //     if (method === 'json') {
     //         return JSON.stringify(this);
     //     } else {
+    // eslint-disable-next-line max-len
     //         throw new NotImplementedError('Only JSON serialization is currently supported'); // eslint-disable-line max-len
     //     }
     // }
@@ -86,6 +95,7 @@ class GeocoderServiceResult {
     //         const resultItem = new GeocoderServiceResult(200, parsedItem);
     //         return resultItem;
     //     } else {
+    // eslint-disable-next-line max-len
     //         throw new NotImplementedError('Only JSON serialization is currently supported'); // eslint-disable-line max-len
     //     }
     // }

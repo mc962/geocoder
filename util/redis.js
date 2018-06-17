@@ -10,45 +10,61 @@ const moment = require('moment');
 
 const rGetAsync = promisify(redisClient.get).bind(redisClient);
 const rSetAsync = promisify(redisClient.set).bind(redisClient);
+const rDelAsync = promisify(redisClient.del).bind(redisClient);
 
-
-const rFetchAsync = async (key, fetchCb = null, cbArgs = [], redisOptions = []) => { // eslint-disable-line max-len
-    // TODO handle TTLs/redis request options
-    // add support to other functions as needed
-    if (fetchCb) {
+const rFetchAsync = async (key, cbOptions, redisOptions = []) => { // eslint-disable-line max-len
+    // refresh data in cache at key, if refresh_cached param provided
+    return _delProm(key, cbOptions).then(async (delRes) => {
+        // get data at key
         return await rGetAsync(key).then((responseVal) => {
             if (responseVal) {
+                // when data retrieved from redis
+
+                // return deserialzied response received from redis
                 const deserializedResults = _deserializeListResults(responseVal); // eslint-disable-line max-len
                 return deserializedResults;
             } else {
-                return fetchCb(...cbArgs)
+                // when no data retrieved from redis
+
+                // obtain data using fetchCb, if fetchCb supplied
+                return _fetchProm(cbOptions)
                     .then(async (resp) => {
-                        const serializedResults = _serializeGeocoderResult(resp); // eslint-disable-line max-len
-                        return await rSetAsync(key, serializedResults, ...redisOptions) // eslint-disable-line max-len
+                        if (resp === 'OK') {
+                            // eslint-disable-next-line max-len
+                            // when response is 'OK', means that no fetchCb was given
+
+                            // in this case, no data was also retrieved,
+                            // therefore Not Found response is assumed
+                            const notFoundPayload = {
+                                status: 404,
+                                results: [],
+                            };
+
+                            return notFoundPayload;
+                        } else {
+                        /*
+                        no data was retrieved from redis, but fetchCb was given
+
+                        response was not 'OK', therefore assumed that fetchCb
+                        was given
+                        results are therefore serialized and added to redis
+                        */
+                            const serializedResults = _serializeGeocoderResult(resp); // eslint-disable-line max-len
+                            return await rSetAsync(key, serializedResults, ...redisOptions) // eslint-disable-line max-len
                             .then((setRes) => {
                                 return resp;
+                            })
+                            .catch((err) => {
+                                return err;
                             });
+                        }
                     })
                     .catch((err) => {
                         return err;
                     });
             }
         });
-    } else {
-        return await rGetAsync(key)
-            .then((response) => {
-                let finalResponse;
-                if (response) {
-                    finalResponse = _deserializeListResults(response); // eslint-disable-line max-len
-                } else {
-                    finalResponse = [];
-                }
-                return finalResponse;
-            })
-            .catch((err) => {
-                return {status: 200, results: finalResponse};
-            });
-    }
+    });
 };
 
 const _serializeGeocoderResult = (result) => {
@@ -93,6 +109,40 @@ const redisOptions = (...requestParams) => {
     });
 
     return requestOptions;
+};
+
+const _delProm = (key, cbOptions) => {
+    let deletePromise;
+    if (cbOptions.refreshCached) {
+        deletePromise = async () => {
+            return await rDelAsync(key);
+        };
+    } else {
+        deletePromise = async () => {
+            return new Promise((resolve, _) => {
+                resolve('OK');
+            });
+        };
+    }
+
+    return deletePromise();
+};
+
+const _fetchProm = (cbOptions) => {
+    let fetchPromise;
+    if (cbOptions.fetchCb) {
+        fetchPromise = async () => {
+            return cbOptions.fetchCb(...cbOptions.cbArgs);
+        };
+    } else {
+        fetchPromise = async () => {
+            return new Promise((resolve, _) => {
+                resolve('OK');
+            });
+        };
+    }
+
+    return fetchPromise();
 };
 
 module.exports = {
