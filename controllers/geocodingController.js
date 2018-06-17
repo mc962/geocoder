@@ -1,17 +1,19 @@
 const _first = require('lodash/first');
 const slugify = require('slugify');
 const { rFetchAsync, redisOptions } = require('../util/redis');
+const { GeocoderServiceResult } = require('../util/geocoding');
 
 const mapsClient = require('@google/maps').createClient({
     key: process.env.GOOGLE_API_KEY,
     Promise: Promise,
 });
 
-const _coordinatesFromCache = async (address) => {
+const _coordinatesFromCache = async (address, deleteCached = false) => {
     const key = _citySlug(address);
-    return await rFetchAsync(key, _geocode, [address], redisOptions().ex)
+    return await rFetchAsync(key, null, [address], redisOptions().ex)
         .then((responseData) => {
-            return responseData;
+            const resultObj = GeocoderServiceResult.coerceResult(responseData);
+            return resultObj;
         })
         .catch((err)=> {
             return err;
@@ -31,25 +33,30 @@ const _placeFromCache = async (latLng) => {
 
 const coordinates = async (req, res) => {
     const cached = req.params.cached || req.query.cached;
+    const deleteCached = req.params.delete_cached || req.query.delete_cached;
     const address = req.params.address || req.query.address;
 
     const geocode = cached ? _coordinatesFromCache : _geocode;
 
-    await geocode(address)
-        .then((responseData) => {
-            const singleResult = _first(results);
-            const latLng = singleResult.geometry.location;
-            const address = singleResult.formatted_address;
-            console.log(`Status: ${status} - City: ${address} -`,
-                `Latitude: ${latLng.lat} -`,
-                `Longitude: ${latLng.lng}`);
+    await geocode(address, deleteCached)
+        .then((geocodeResult) => {
+            if (geocodeResult.empty()) {
+                const err = _constructLocalGeocodeError(404, 'NOT FOUND', 'No results found'); // eslint-disable-line max-len
+                _handleGeocodeError(res, err);
+            } else {
+                const latLng = geocodeResult.latLng();
+                const address = geocodeResult.address();
+                const status = geocodeResult.status;
+                console.log(`Status: ${status} - City: ${address} -`,
+                    `Latitude: ${latLng.lat} -`,
+                    `Longitude: ${latLng.lng}`);
 
-            const responseJSON = {
-                location: address,
-                coordinates: latLng,
-            };
-
-            res.status(200).json(responseJSON);
+                const responseJSON = {
+                    location: address,
+                    coordinates: latLng,
+                };
+                res.status(geocodeResult.status).json(responseJSON);
+            }
         })
         .catch((err) => {
             _handleGeocodeError(res, err);
@@ -80,14 +87,14 @@ const place = async (req, res) => {
 };
 
 const _geocode = async (address) => {
-    await mapsClient.geocode({
+    return await mapsClient.geocode({
         address: address,
     }).asPromise()
     .then((response) => {
-        status = response.status;
-        results = response.json.results;
-        responseData = { status: status, results: results };
-        Promise.resolve(responseData);
+        const status = response.status;
+        const results = response.json.results;
+        const geocodeResult = new GeocoderServiceResult(status, results);
+        return geocodeResult;
     })
     .catch((err) => {
         return err;
@@ -100,9 +107,9 @@ const _reverseGeocode = async (latLng) => {
         latlng: latLng,
     }).asPromise()
     .then((response) => {
-        status = response.status;
-        results = response.json.results;
-        responseData = { status: status, results: results };
+        const status = response.status;
+        const results = response.json.results;
+        const responseData = { status: status, results: results };
         return responseData;
     })
     .catch((err) => {
@@ -113,9 +120,19 @@ const _reverseGeocode = async (latLng) => {
 const _handleGeocodeError = (res, err) => {
     const errorMessage = `${err.json.status}: ${err.json.error_message}`;
     const logMessage = `${err.status} - ${errorMessage}`;
-    status = err.status >= 400 ? err.status : 500;
+    const status = err.status >= 400 ? err.status : 500;
     console.error(logMessage);
     res.status(status).json({message: errorMessage});
+};
+
+const _constructLocalGeocodeError = (status, errorStatus, message) => {
+    return {
+        status: status,
+        json: {
+            status: errorStatus,
+            error_message: message,
+        },
+    };
 };
 
 const _citySlug = (str) => {

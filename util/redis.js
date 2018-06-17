@@ -23,10 +23,10 @@ const rFetchAsync = async (key, fetchCb = null, cbArgs = [], redisOptions = []) 
             } else {
                 return fetchCb(...cbArgs)
                     .then(async (resp) => {
-                        const serializedResults = _serializeListResults(results); // eslint-disable-line max-len
-                        await rSetAsync(key, serializedResults, ...redisOptions)
+                        const serializedResults = _serializeGeocoderResult(resp); // eslint-disable-line max-len
+                        return await rSetAsync(key, serializedResults, ...redisOptions) // eslint-disable-line max-len
                             .then((setRes) => {
-                                return results;
+                                return resp;
                             });
                     })
                     .catch((err) => {
@@ -37,26 +37,32 @@ const rFetchAsync = async (key, fetchCb = null, cbArgs = [], redisOptions = []) 
     } else {
         return await rGetAsync(key)
             .then((response) => {
-                return responseVal;
+                let finalResponse;
+                if (response) {
+                    finalResponse = _deserializeListResults(response); // eslint-disable-line max-len
+                } else {
+                    finalResponse = [];
+                }
+                return finalResponse;
             })
             .catch((err) => {
-                return err;
+                return {status: 200, results: finalResponse};
             });
     }
 };
 
-const _serializeListResults = (results) => {
-    let serializedResults;
+const _serializeGeocoderResult = (result) => {
+    let serializedResult;
     try {
-        serializedResults = JSON.stringify(results);
+        serializedResult = JSON.stringify(result);
     } catch (e) {
         // catch potential JSON serialziation errors, and return a blank array
         // indicating no good results found (and preventing disruptions
         // to future data flow), along with logging the message
         console.error(e);
-        return [];
+        return '[]';
     }
-    return serializedResults;
+    return serializedResult;
 };
 
 const _deserializeListResults = (results) => {
@@ -69,7 +75,7 @@ const _deserializeListResults = (results) => {
         // (and preventing disruptionsto future data flow),
         // along with logging the message
         console.error(e);
-        return [];
+        return '[]';
     }
     return deserializedResults;
 };
