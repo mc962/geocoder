@@ -1,4 +1,3 @@
-const _first = require('lodash/first');
 const slugify = require('slugify');
 const { rFetchAsync, redisOptions } = require('../util/redis');
 const { GeocoderServiceResult } = require('../util/geocoding');
@@ -15,7 +14,6 @@ const _coordinatesFromCache = async (address, refreshCached = false) => {
         cbArgs: [address],
         refreshCached: refreshCached,
     };
-
     return await rFetchAsync(key, cbOptions, redisOptions().ex)
         .then((responseData) => {
             const resultObj = GeocoderServiceResult.coerceResult(responseData);
@@ -26,11 +24,17 @@ const _coordinatesFromCache = async (address, refreshCached = false) => {
         });
 };
 
-const _placeFromCache = async (latLng) => {
+const _placeFromCache = async (latLng, refreshCached = false) => {
     const key = _coordsSlug(latLng);
-    rFetchAsync(key, _reverseGeocode, [latLng])
+    const cbOptions = {
+        fetchCb: _reverseGeocode,
+        cbArgs: [latLng],
+        refreshCached: refreshCached,
+    };
+    return await rFetchAsync(key, cbOptions, redisOptions().ex)
         .then((responseData) => {
-            return responseData;
+            const resultObj = GeocoderServiceResult.coerceResult(responseData);
+            return resultObj;
         })
         .catch((err) => {
             return err;
@@ -58,7 +62,7 @@ const coordinates = async (req, res) => {
                     `Longitude: ${latLng.lng}`);
 
                 const responseJSON = {
-                    location: address,
+                    locationRequested: address,
                     coordinates: latLng,
                 };
                 res.status(geocodeResult.status).json(responseJSON);
@@ -71,21 +75,30 @@ const coordinates = async (req, res) => {
 
 const place = async (req, res) => {
     const cached = req.params.cached || req.query.cached;
+    const refreshCached = req.params.refresh_cached || req.query.refresh_cached;
     const latLng = req.params.latLng || req.query.latLng;
 
     const reverseGeocode = cached ? _placeFromCache : _reverseGeocode;
 
-    await reverseGeocode(latLng)
-        .then((responseData) => {
-            const singleResult = _first(results);
-            const address = singleResult.formatted_address;
-            console.log(`City: ${address}`);
+    await reverseGeocode(latLng, refreshCached)
+        .then((geocodeResult) => {
+            if (geocodeResult.empty()) {
+                const err = _constructLocalGeocodeError(404, 'NOT FOUND', 'No results found'); // eslint-disable-line max-len
+                _handleGeocodeError(res, err);
+            } else {
+                const address = geocodeResult.address();
+                const latLng = geocodeResult.latLng();
+                const status = geocodeResult.status;
+                console.log(`Status: ${status} - City: ${address} -`,
+                    `Latitude: ${latLng.lat} -`,
+                    `Longitude: ${latLng.lng}`);
+                const responseJSON = {
+                    location: address,
+                    coordinatesRequested: latLng,
+                };
 
-            const responseJSON = {
-                location: address,
-            };
-
-            res.status(200).json(responseJSON);
+                res.status(geocodeResult.status).json(responseJSON);
+            }
         })
         .catch((err) => {
             _handleGeocodeError(res, err);
@@ -109,14 +122,14 @@ const _geocode = async (address) => {
 
 const _reverseGeocode = async (latLng) => {
     // TODO logic to handle geolocation information stored on request cookies
-    await mapsClient.reverseGeocode({
+    return await mapsClient.reverseGeocode({
         latlng: latLng,
     }).asPromise()
     .then((response) => {
         const status = response.status;
         const results = response.json.results;
-        const responseData = { status: status, results: results };
-        return responseData;
+        const geocodeResult = new GeocoderServiceResult(status, results);
+        return geocodeResult;
     })
     .catch((err) => {
         return err;
@@ -146,7 +159,7 @@ const _citySlug = (str) => {
 };
 
 const _coordsSlug = (coords) => {
-    return `lat-${coords.lat}-lon-${coords.lon}`;
+    return `lat-${coords.lat}-lon-${coords.lng}`;
 };
 
 module.exports = {
