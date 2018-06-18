@@ -1,7 +1,7 @@
 const { check, validationResult } = require('express-validator/check');
 
 const validateCoordinatesParams = [
-    check('address').exists().isString(),
+    check('address').exists().isString().not().isEmpty(),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {

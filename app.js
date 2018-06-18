@@ -11,6 +11,7 @@ const bodyParser = require('body-parser');
 
 // import manually defined config
 const config = require('./config');
+const { testRedisHealth } = require('./util/health');
 
 // import controller routers
 const geocoding = require('./routes/geocoding');
@@ -68,7 +69,23 @@ router.use('/directions', directions);
 
 // add top-level router routes
 router.get('/ping', (req, res) => {
-    res.status(200).json({message: 'PONG'});
+    testRedisHealth()
+        .then((redisHealthRes) => {
+            const healthPayload = {
+                generalHealth: 'PONG',
+                redisHealth: redisHealthRes,
+            };
+
+            res.status(200).json(healthPayload);
+        })
+        .catch((redisHealthRes) => {
+            const healthPayload = {
+                generalHealth: 'PONG',
+                redisHealth: redisHealthRes,
+            };
+
+            res.status(500).json(healthPayload);
+        });
 });
 
 

@@ -19,7 +19,7 @@ const processEnvVars = async (content) => {
     const contentSets = content.split(/\n/);
 
     // trim spaces from each env var set
-    trimmedContentSets = contentSets.map((set) => {
+    const trimmedContentSets = contentSets.map((set) => {
         return set.replace(/\s/g, '');
     });
 
