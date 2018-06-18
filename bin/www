@@ -25,7 +25,7 @@ const server = http.createServer(app);
 /**
  * Set a default server timeout to 60 seconds for a request
  */
-server.timeout = 60;
+server.timeout = 6000;
 
 /**
  * Listen on provided port, on all network interfaces.
