@@ -11,6 +11,7 @@ const moment = require('moment');
 const rGetAsync = promisify(redisClient.get).bind(redisClient);
 const rSetAsync = promisify(redisClient.set).bind(redisClient);
 const rDelAsync = promisify(redisClient.del).bind(redisClient);
+const rPing = promisify(redisClient.ping).bind(redisClient);
 
 /**
  * Gets a value under a specified key in Redis, if no value is returned,
@@ -162,5 +163,6 @@ module.exports = {
     rGetAsync: rGetAsync,
     rSetAsync: rSetAsync,
     rFetchAsync: rFetchAsync,
+    rPing: rPing,
     redisOptions: redisOptions,
 };
