@@ -12,6 +12,17 @@ const rGetAsync = promisify(redisClient.get).bind(redisClient);
 const rSetAsync = promisify(redisClient.set).bind(redisClient);
 const rDelAsync = promisify(redisClient.del).bind(redisClient);
 
+/**
+ * Gets a value under a specified key in Redis, if no value is returned,
+ * (cache miss), may supply a callback to return new data
+ * if callback is supplied, returned value of callback is serialized
+ * and written to cache, and then returned from the fetch function
+ * @param {String} key string
+ * @param {Object} cbOptions arguments to be passed to the supplied callback
+ * @param {Array} redisOptions arguments to be passed to the redis request
+ * @return {Object} payload for either returned results, NotFound
+ * results, or a caught error
+ */
 const rFetchAsync = async (key, cbOptions, redisOptions = []) => { // eslint-disable-line max-len
     // refresh data in cache at key, if refresh_cached param provided
     return _delProm(key, cbOptions).then(async (delRes) => {
@@ -35,6 +46,8 @@ const rFetchAsync = async (key, cbOptions, redisOptions = []) => { // eslint-dis
 
                             // in this case, no data was also retrieved,
                             // therefore Not Found response is assumed
+                            // eslint-disable-next-line max-len
+                            // TODO uncouple this form geocoding by making more genric response for geocoder to handle
                             const notFoundPayload = {
                                 status: 404,
                                 results: [],
